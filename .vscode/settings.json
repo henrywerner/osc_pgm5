@@ -1,7 +1,0 @@
-{
-    "files.associations": {
-        "*.asl": "csharp",
-        "vector": "cpp",
-        "random": "cpp"
-    }
-}
