@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "*.asl": "csharp",
+        "vector": "cpp",
+        "algorithm": "cpp",
+        "xstring": "cpp",
+        "cstdlib": "cpp",
+        "random": "cpp",
+        "iostream": "cpp"
+    }
+}
