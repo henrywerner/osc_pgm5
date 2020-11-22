@@ -1,3 +1,32 @@
+/*
+file: hddSim.cpp
+author: Gherkin
+modification history: 
+    Gherkin
+    November 22nd, 2020
+procedures:
+    [general methods]
+    main - Manages the calls for the testing and printing methods.
+    executeAlg - Manages the testing conditions and execution of the scheduling algorithms.
+    generateRequests - Randomly generate a collection of simulated I/O requests.
+
+    [disk scheduling algorithms]
+    fifo - Emulates the performance of a First-In-First-Out disk scheduling algorithm.
+    sstf - Emulates the performance of a Shortest Service Time First disk scheduling algorithm.
+    scan - Emulates the performance of a SCAN disk scheduling algorithm.
+    lifo - Emulates the performance of a Last-In-First-Out disk scheduling algorithm.
+
+    [print management]
+    printResults - Apply stylization and print algorithm test results to the console.
+    updateProgressBar - Print a graphical indicator of the current test's progression.
+
+    [helper methods]
+    updateSector - Produce an updated sector value based on the given time value.
+    quicksort - Use a Quicksort algorithm to sort I/O requests by either Sector or Track values.
+    partitionBySector - Quicksort partitioning through comparing Sector values of each I/O request.
+    partitionByTrack - Quicksort partitioning through comparing Track values of each I/O request.
+*/
+
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -10,8 +39,9 @@
 
 using namespace std;
 
+/* Define HDD constants */
 #define EXPERIMENTS 1000
-#define AVG_SEEK_TIME 0.024875  // Time needed to move the head between tracks
+#define AVG_SEEK_TIME 0.024875  // Time needed to move the head between tracks in milliseconds
 #define AVG_ROT_LATENCY 2.5     // Avg Rotational Latency; 2.5 ms for 180 degrees
 #define TRANSFER_RATE 6         // 6 GB/s
 #define BLOCK_SIZE 4            // 4 KB
@@ -22,20 +52,22 @@ using namespace std;
 #define TRACKS 201
 #define SECTORS 360
 
-// holds the info (results) for one experiment
+/* Struct holding the info (results) for one experiment */
 struct hddSim
 {
-    float avgRequestT;          // Average Request Time
     float avgSeekLength;        // Average Seek Time
-    float avgRotDelay;          // Average Rotational Delay
-    float avgAccessT;           // Average Access Time
-    int totalBytes;             // Total number of bytes transfered
     int totalRequests;          // Total number of requests
     float totalTime;            // Total time duration of simulation
     float totalAvgAccessTime;   // Total average access time
+
+    /* Unused vars */
+    //float avgRequestT;        // Average Request Time
+    //float avgRotDelay;        // Average Rotational Delay
+    //float avgAccessT;         // Average Access Time
+    //int totalBytes;           // Total number of bytes transferred
 };
 
-// holds overall testing results for a disk scheduling policy
+/* Struct holding one algorithm's overall results for a batch of tests */
 struct results
 {
     float totalAvgAccessTime;   // Total Average Access Time
@@ -43,7 +75,8 @@ struct results
     int totalReq;               // Total number of requests
 };
 
-vector<results> runAlg(char alg);
+/* Define methods */
+vector<results> executeAlg(char alg);
 hddSim fifo(vector<ioReq> req);
 hddSim sstf(vector<ioReq> req);
 hddSim scan(vector<ioReq> req);
@@ -51,18 +84,23 @@ hddSim lifo(vector<ioReq> req);
 vector<ioReq> generateRequests(int n, unsigned seed);
 void printResults(vector<results> res);
 void updateProgressBar(int p, int total, char alg);
-
 int partitionBySector(vector<ioReq> &values, int left, int right);
 int partitionByTrack(vector<ioReq> &req, int left, int right);
-void quicksort(vector<ioReq> &values, int left, int right, string compairison);
-vector<vector<ioReq>> splitTracks(vector<ioReq> values);
+void quicksort(vector<ioReq> &values, int left, int right, string comparison);
 
+
+/*
+    int main()
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Manages the calls for the testing and printing methods.
+*/
 int main()
 {
-    vector<results> fifoResults = runAlg('a');
-    vector<results> sstfResults = runAlg('b');
-    vector<results> scanResults = runAlg('c');
-    vector<results> lifoResults = runAlg('d');
+    vector<results> fifoResults = executeAlg('a');
+    vector<results> sstfResults = executeAlg('b');
+    vector<results> scanResults = executeAlg('c');
+    vector<results> lifoResults = executeAlg('d');
 
     cout << "FIFO Results:\n";
     printResults(fifoResults);
@@ -76,23 +114,38 @@ int main()
     return 0;
 }
 
-vector<results> runAlg(char alg)
+/*
+    vector<results> executeAlg(char alg)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Manages the testing conditions and execution of the scheduling algorithms.
+    parameters:
+        alg         I/P  char             character indicating which alg to execute
+        executeAlg  O/P  vector<results>  Vector containing the results for all tests
+*/
+vector<results> executeAlg(char alg)
 {
+    // start clock
     typedef std::chrono::high_resolution_clock clock;
     clock::time_point start_point = clock::now();
+
     vector<results> algRes;
 
+    // testing range of 50 to 150 I/O requests, incrementing in steps of 10
     for (int io = 50; io <= 150; io += 10)
     {
         results batchRes; // set up collection results struct
         batchRes.avgReqTime = 0;
         batchRes.totalReq = 0;
 
+        // conduct 1000 trials and report the averaged results
         for (int e = 0; e < EXPERIMENTS; e++)
         {
+            // create randomization seed using the duration from the clock's staring point
             clock::duration d = clock::now() - start_point;
             unsigned seed = d.count();
-            vector<ioReq> requests = generateRequests(io, seed);
+
+            vector<ioReq> requests = generateRequests(io, seed); // generate vector of I/O requests
             hddSim s;
 
             switch (alg)
@@ -119,7 +172,7 @@ vector<results> runAlg(char alg)
         // convert values into averages
         batchRes.totalAvgAccessTime /= EXPERIMENTS;
         batchRes.avgReqTime /= EXPERIMENTS;
-        batchRes.totalReq /= EXPERIMENTS; // I'm not sure if I need to average this one
+        batchRes.totalReq /= EXPERIMENTS;
 
         algRes.push_back(batchRes); // add batch results to total results vector
         updateProgressBar(io - 50, 100, alg);
@@ -127,15 +180,33 @@ vector<results> runAlg(char alg)
     return algRes;
 }
 
+/*
+    int updateSector(float currentTime)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Produce an updated sector value based on the given time value
+    parameters:
+        currentTime   I/P  float  Time value used to calculate sector position
+        updateSector  O/P  int    Updated value of sector position
+*/
 int updateSector(float currentTime)
 {
     int s = currentTime * (RPMS / 360);
     s -= (360 * (s / 360));
     s -= 1;
-    //cout << "sector updated: " + to_string(s) + "\n";
     return s;
 }
 
+/*
+    int updateSector(int sector, int duration)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Increased the current sector value based on the given time value
+    parameters:
+        sector        I/P  int  Current sector position value
+        duration      I/P  int  Duration of time
+        updateSector  O/P  int  Increased value of sector position
+*/
 int updateSector(int sector, int duration)
 {
     int sec = sector;
@@ -145,10 +216,18 @@ int updateSector(int sector, int duration)
         if (sec == 360)
             sec = 0;
     }
-    //cout << "sector increased: " + to_string(sector) + "\n";
     return sec;
 }
 
+/*
+    hddSim fifo(vector<ioReq> req)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Emulates the performance of a First-In-First-Out disk scheduling algorithm.
+    parameters:
+        req   I/P  vector<ioReq>  Vector of simulated I/O requests
+        fifo  O/P  hddSim         Struct containing simulation statistics
+*/
 hddSim fifo(vector<ioReq> req)
 {
     int dhTrack = 100; // Disk head track starts at 100 for each experiment
@@ -169,16 +248,16 @@ hddSim fifo(vector<ioReq> req)
         dhTrack = r.track;                      // set dhTrack to the destination value
         dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -192,6 +271,15 @@ hddSim fifo(vector<ioReq> req)
     return sim;
 }
 
+/*
+    hddSim sstf(vector<ioReq> req)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Emulates the performance of a Shortest Service Time First disk scheduling algorithm.
+    parameters:
+        req   I/P  vector<ioReq>  Vector of simulated I/O requests
+        sstf  O/P  hddSim         Struct containing simulation statistics
+*/
 hddSim sstf(vector<ioReq> req)
 {
     int dhTrack = 100; // Disk head track starts at 100 for each experiment
@@ -207,7 +295,6 @@ hddSim sstf(vector<ioReq> req)
     // sort request vector then group by tracks
     quicksort(req, 0, rSize, "sector");
     quicksort(req, 0, rSize, "track");
-
 
     // find best starting point
     int startIndex = 0;
@@ -228,6 +315,7 @@ hddSim sstf(vector<ioReq> req)
 
         futureTime += sectDiff * (RPMS / 360);
 
+        // if evaluated potential time is better than current best
         if (futureTime < startTime)
         {
             startIndex = x;
@@ -239,9 +327,9 @@ hddSim sstf(vector<ioReq> req)
     if (req[startIndex].track < dhTrack)
         ascendingStart = false;
 
-
+    // HUB section determines the control flow
     HUB:
-    if (ascendingStart)
+    if (ascendingStart) // if drive head starts in an ascending direction
     {
         if (!ascended)
             goto ASCEND;
@@ -250,7 +338,7 @@ hddSim sstf(vector<ioReq> req)
         else
             goto END;
     }
-    else
+    else // if drive head starts in an descending direction
     {
         if (!descended)
             goto DESCEND;
@@ -260,9 +348,8 @@ hddSim sstf(vector<ioReq> req)
             goto END;
     }
     
-
     ASCEND:
-    // head is moving ascending order first
+    // head is moving in ascending order
     for (int t = startIndex; t < rSize; t++)
     {
         // check for track switches
@@ -277,19 +364,18 @@ hddSim sstf(vector<ioReq> req)
             dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
         }
 
-        /* do normal calcs */
         ioReq r = req[t];
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -299,10 +385,10 @@ hddSim sstf(vector<ioReq> req)
         sim.totalAvgAccessTime += totalAvgAccessTime;
     }
     ascended = true;
-    goto HUB;
+    goto HUB; // return to HUB
 
     DESCEND:
-    // head traverses back in reverse order
+    // head traverses in reverse order
     for (int t = startIndex; t >= 0; t--)
     {
         // check for track switches
@@ -317,19 +403,18 @@ hddSim sstf(vector<ioReq> req)
             dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
         }
 
-        /* do normal calcs */
         ioReq r = req[t];
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -339,7 +424,7 @@ hddSim sstf(vector<ioReq> req)
         sim.totalAvgAccessTime += totalAvgAccessTime;
     }
     descended = true;
-    goto HUB;
+    goto HUB; // return to HUB
 
     END:
     sim.totalAvgAccessTime /= req.size();
@@ -347,6 +432,15 @@ hddSim sstf(vector<ioReq> req)
     return sim;
 }
 
+/*
+    hddSim scan(vector<ioReq> req)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Emulates the performance of a SCAN disk scheduling algorithm.
+    parameters:
+        req   I/P  vector<ioReq>  Vector of simulated I/O requests
+        scan  O/P  hddSim         Struct containing simulation statistics
+*/
 hddSim scan(vector<ioReq> req)
 {
     int dhTrack = 100; // Disk head track starts at 100 for each experiment
@@ -386,19 +480,18 @@ hddSim scan(vector<ioReq> req)
             dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
         }
 
-        /* do normal calcs */
         ioReq r = req[t];
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -423,19 +516,18 @@ hddSim scan(vector<ioReq> req)
             dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
         }
 
-        /* do normal calcs */
         ioReq r = req[t];
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -450,6 +542,15 @@ hddSim scan(vector<ioReq> req)
     return sim;
 }
 
+/*
+    hddSim lifo(vector<ioReq> req)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Emulates the performance of a Last-In-First-Out disk scheduling algorithm.
+    parameters:
+        req   I/P  vector<ioReq>  Vector of simulated I/O requests
+        lifo  O/P  hddSim         Struct containing simulation statistics
+*/
 hddSim lifo(vector<ioReq> req)
 {
     int dhTrack = 100; // Disk head track starts at 100 for each experiment
@@ -473,16 +574,16 @@ hddSim lifo(vector<ioReq> req)
         dhTrack = r.track;                      // set dhTrack to the destination value
         dhSector = updateSector(sim.totalTime); // accounting for disk spin while seeking
 
-        // calculate rotaional latency
+        // calculate rotational latency
         int sectDiff = 0;
         if (r.sector >= dhSector)
             sectDiff = r.sector - dhSector;
         else
-            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the addional rotation
+            sectDiff = (359 - dhSector) + r.sector; // the remaining distance on the disk plus the additional rotation
         dhSector = updateSector(dhSector, sectDiff);
         sim.totalTime += sectDiff * (RPMS / 360);
 
-        // calulate transfer time
+        // calculate transfer time
         float transferTime = (float)(BLOCK_SIZE * 1024) / (float)6000000000;
         transferTime *= 1000;
         sim.totalTime += transferTime;
@@ -499,6 +600,16 @@ hddSim lifo(vector<ioReq> req)
     return sim;
 }
 
+/*
+    vector<ioReq> generateRequests(n, seed)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Randomly generate a collection of simulated I/O requests.
+    parameters:
+        n                 I/P  int            Number of requests to generate
+        seed              I/P  unsigned       Randomization seed
+        generateRequests  O/P  vector<ioReq>  Vector of simulated I/O requests 
+*/
 vector<ioReq> generateRequests(int n, unsigned seed)
 {
     vector<ioReq> requests;
@@ -518,6 +629,14 @@ vector<ioReq> generateRequests(int n, unsigned seed)
     return requests;
 }
 
+/*
+    void printResults(res)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Apply stylization and print algorithm test results to the console.
+    parameters:
+        res  I/P  vector<results>  All testing results for one algorithm
+*/
 void printResults(vector<results> res)
 {
     cout << " T#  |  Avg Req Time |  Requests   |    Avg Access Time \n";
@@ -535,6 +654,17 @@ void printResults(vector<results> res)
     cout << endl;
 }
 
+/*
+    void updateProgressBar(p, total, alg)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Print a graphical indicator of the current test's progression.
+    parameters:
+        p      I/P  int   Progression of execution loop
+        total  I/P  int   End point of loop
+        alg    I/P  char  Character representation of current algorithm
+
+*/
 void updateProgressBar(int p, int total, char alg)
 {
     float progress = (float)p / total;
@@ -568,21 +698,44 @@ void updateProgressBar(int p, int total, char alg)
     }
 }
 
-void quicksort(vector<ioReq> &req, int left, int right, string compairison)
+/*
+    void quicksort(&req, left, right, comparison)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Use a Quicksort algorithm to sort I/O requests by either Sector or Track values.
+    parameters:
+        &req        I/P  vector<ioReq>  Vector of I/O requests to be sorted
+        left        I/P  int            Left most point of vector
+        right       I/P  int            Right most point of vector
+        comparison  I/P  string         Indicating what value should be compared
+
+*/
+void quicksort(vector<ioReq> &req, int left, int right, string comparison)
 {
     if (left < right)
     {
         int pivot;
-        if (compairison == "sector")
+        if (comparison == "sector")
             pivot = partitionBySector(req, left, right);
         else
             pivot = partitionByTrack(req, left, right);
 
-        quicksort(req, left, pivot - 1, compairison);
-        quicksort(req, pivot, right, compairison);
+        quicksort(req, left, pivot - 1, comparison);
+        quicksort(req, pivot, right, comparison);
     }
 }
 
+/*
+    int partitionBySector(&req, left, right)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Quicksort partitioning through comparing Sector values of each I/O request.
+    parameters:
+        &req               I/P  vector<ioReq>  Vector of I/O requests to be sorted
+        left               I/P  int            Left most point of vector
+        right              I/P  int            Right most point of vector
+        partitionBySector  O/P  int            Identified pivot point
+*/
 int partitionBySector(vector<ioReq> &req, int left, int right)
 {
     ioReq temp;
@@ -610,6 +763,17 @@ int partitionBySector(vector<ioReq> &req, int left, int right)
     return l;
 }
 
+/*
+    int partitionByTrack(&req, left, right)
+    author: Gherkin
+    date: Nov 22, 2020
+    description: Quicksort partitioning through comparing Track values of each I/O request.
+    parameters:
+        &req              I/P  vector<ioReq>  Vector of I/O requests to be sorted
+        left              I/P  int            Left most point of vector
+        right             I/P  int            Right most point of vector
+        partitionByTrack  O/P  int            Identified pivot point
+*/
 int partitionByTrack(vector<ioReq> &req, int left, int right)
 {
     ioReq temp;
